@@ -22,11 +22,11 @@ const DISPLAY_INTERVAL: Duration = Duration::from_millis(100);
 #[command(version = "1.0")]
 #[command(about = "Probe CPU frequency information", long_about = None)]
 struct Cli {
-    #[arg(long, help = "Set of comma-delimited CPU IDs to track")]
-    cpuset: Option<String>,
-
     #[command(subcommand)]
     interface: Option<Interface>,
+
+    #[arg(global = true, long, help = "Set of comma-delimited CPU IDs to track")]
+    cpuset: Option<String>,
 }
 
 #[derive(Subcommand, Default)]
