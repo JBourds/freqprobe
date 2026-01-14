@@ -1,15 +1,19 @@
 use std::collections::VecDeque;
-use std::fs;
-use std::io::{Read, Write};
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::io::{Seek, stdout};
 use std::path::{Path, PathBuf};
+use std::process::exit;
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 
+use clap::Arg;
+
 const SYSFS_CPUS: &str = "/sys/devices/system/cpu";
+const SYSFS_CPUFREQ: &str = "/sys/devices/system/cpu/cpufreq";
 const PROCFS_CPUINFO: &str = "/proc/cpuinfo";
-const WINDOW_SIZE: usize = 1;
-const SAMPLE_INTERVAL: Duration = Duration::from_millis(10);
+const WINDOW_SIZE: usize = 10000;
+const SAMPLE_INTERVAL: Duration = Duration::from_millis(1);
 const DISPLAY_INTERVAL: Duration = Duration::from_millis(100);
 
 #[derive(Debug)]
@@ -54,7 +58,7 @@ fn clear_screen() {
     stdout().flush().unwrap();
 }
 
-fn read_file(path: impl AsRef<Path>) -> u64 {
+fn read_sysfs_uint(path: impl AsRef<Path>) -> u64 {
     let mut s = String::new();
     let mut file = fs::OpenOptions::new()
         .read(true)
@@ -90,13 +94,34 @@ fn get_cpu_files() -> Vec<(PathBuf, CpuStat)> {
     cpu_files
 }
 
+/// parse /proc/cpuinfo to get every CPU's current frequency
+fn parse_procfs_cpuinfo() -> Vec<u64> {
+    let mut cpu_frequencies = Vec::new();
+    let file = File::open(PROCFS_CPUINFO).expect("couldn't open procfs file");
+    let reader = BufReader::new(file);
+    for line in reader.lines().map_while(Result::ok) {
+        let Some(line) = line.strip_prefix("cpu MHz") else {
+            continue;
+        };
+        let line = line.trim_start();
+        let Some(line) = line.strip_prefix(":") else {
+            eprintln!("incorrrect file format");
+            exit(1)
+        };
+        let line = line.trim_start();
+        let frequency_mhz = line.parse::<f64>().expect("couldn't parse frequency");
+        cpu_frequencies.push((frequency_mhz * 1000.0) as u64);
+    }
+    cpu_frequencies
+}
+
 fn main() {
     let mut cpu_files = get_cpu_files();
     let mut now = SystemTime::now();
     let mut next = now + DISPLAY_INTERVAL;
     loop {
         for (path, stats) in &mut cpu_files {
-            let sample = read_file(path);
+            let sample = read_sysfs_uint(path);
             stats.add_sample(sample);
         }
 
@@ -104,7 +129,7 @@ fn main() {
         if now > next {
             clear_screen();
             for (_, stats) in &cpu_files {
-                println!("cpu {}: {}MHz", stats.id, stats.avg_mhz())
+                println!("cpu {}: {:.3}MHz", stats.id, stats.avg_mhz())
             }
             next = now + DISPLAY_INTERVAL;
         }
