@@ -32,7 +32,7 @@ pub fn validate_cpuset(cpuset: String) -> Result<HashSet<usize>, ProbeError> {
     for id in cpuset.split(",") {
         let id = id
             .parse::<usize>()
-            .map_err(|_| ProbeError::InvalidCpuId(id.to_string()))?;
+            .map_err(|_| ProbeError::IntConversionError(id.to_string()))?;
         cpu_ids.insert(id);
     }
     Ok(cpu_ids)
@@ -76,11 +76,13 @@ pub fn cpuset_with_stats(cpuset: &HashSet<usize>) -> Result<BTreeMap<usize, CpuS
 
 pub fn parse_sysfs_cpuinfo(
     cpuset: &HashSet<usize>,
-) -> Result<BTreeMap<PathBuf, CpuStat>, ProbeError> {
-    let cpu_files: BTreeMap<_, _> = cpuset
-        .iter()
-        .map(|&id| (sysfs_cpu_path(id), CpuStat::new(id, WINDOW_SIZE)))
-        .collect();
+) -> Result<BTreeMap<usize, PathBuf>, ProbeError> {
+    let cpu_files: BTreeMap<_, _> = cpuset.iter().map(|&id| (id, sysfs_cpu_path(id))).collect();
+    for (id, path) in cpu_files.iter() {
+        if !path.exists() {
+            return Err(ProbeError::InvalidCpuId(*id));
+        }
+    }
     Ok(cpu_files)
 }
 

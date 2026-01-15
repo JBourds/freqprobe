@@ -8,6 +8,8 @@ pub enum ProbeError {
     SysfsError(io::Error),
     #[error("procfs error: {0}")]
     ProcfsError(io::Error),
+    #[error("ID conversion error: {0} could not be converted to uint")]
+    IntConversionError(String),
     #[error("invalid cpu ID: {0}")]
-    InvalidCpuId(String),
+    InvalidCpuId(usize),
 }
