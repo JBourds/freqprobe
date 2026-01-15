@@ -10,7 +10,8 @@ const SYSFS_CPUS: &str = "/sys/devices/system/cpu";
 const SYSFS_CPUFREQ: &str = "/sys/devices/system/cpu/cpufreq";
 const PROCFS_CPUINFO: &str = "/proc/cpuinfo";
 
-const WINDOW_SIZE: usize = 10000;
+const WINDOW_SIZE: usize = 10_000;
+const MEGA: f64 = 1_000_000.0;
 
 use crate::cpustat::CpuStat;
 
@@ -104,7 +105,7 @@ pub fn parse_procfs_cpuinfo(cpuset: &HashSet<usize>) -> Result<BTreeMap<usize, u
             };
             let line = line.trim_start();
             let frequency_mhz = line.parse::<f64>().expect("couldn't parse frequency");
-            cpu_frequencies.insert(id, (frequency_mhz * 1000.0) as u64);
+            cpu_frequencies.insert(id, (frequency_mhz * MEGA) as u64);
             current = None;
         } else {
             let Some(line) = line.strip_prefix("processor") else {
