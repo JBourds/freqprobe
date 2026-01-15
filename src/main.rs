@@ -28,24 +28,20 @@ const DEFAULT_WINDOW_SIZE: usize = 10000;
 struct Cli {
     /// Which interface to use for extracting CPU information (procfs/sysfs).
     /// If left blank, will try to automatically determine the correct choice.
-    #[arg(
-        global = true,
-        value_enum,
-        long,
-        help = "Which interface to use for data collection."
-    )]
+    #[arg(global = true, value_enum, long)]
     interface: Option<Interface>,
 
     /// Set of CPU IDs to track.
     /// If left blank, will track all detected CPUs.
-    #[arg(global = true, long, help = "Set of comma-delimited CPU IDs to track")]
+    #[arg(global = true, long)]
     cpuset: Option<String>,
 
     /// Number of milliseconds between each data collection point.
-    #[arg(global = true, long, help = "Sample frequency in ms")]
+    #[arg(global = true, long)]
     sample_freq: Option<u64>,
 
-    #[command(subcommand, help = "How data is output.")]
+    /// The format data is output (monitor/file).
+    #[command(subcommand)]
     output: Output,
 }
 
@@ -58,14 +54,30 @@ enum Interface {
 
 #[derive(Subcommand)]
 enum Output {
-    Monitor { update_freq: Option<u64> },
-    Log { file: PathBuf, duration_ms: u64 },
+    Monitor {
+        /// The frequency which the monitor is refreshed with updated running
+        /// averages of `window-size` size.
+        #[arg(long)]
+        update_freq: Option<u64>,
+
+        /// The number of data points to keep within a running total for
+        /// calculating CPU running average frequency.
+        #[arg(long)]
+        window_size: Option<usize>,
+    },
+    Log {
+        /// Destination CSV file to store CPU data.
+        file: PathBuf,
+        /// Duration in milliseconds to monitor for before exiting.
+        duration_ms: u64,
+    },
 }
 
 impl Default for Output {
     fn default() -> Self {
         Self::Monitor {
             update_freq: Some(DEFAULT_MONITOR_FREQUENCY),
+            window_size: Some(DEFAULT_WINDOW_SIZE),
         }
     }
 }
@@ -94,13 +106,17 @@ impl Runner {
 
     fn run(&mut self) {
         match &self.output {
-            Output::Monitor { update_freq } => {
-                self.monitor(update_freq.unwrap_or(DEFAULT_MONITOR_FREQUENCY))
-            }
+            Output::Monitor {
+                update_freq,
+                window_size,
+            } => self.monitor(
+                update_freq.unwrap_or(DEFAULT_MONITOR_FREQUENCY),
+                window_size.unwrap_or(DEFAULT_WINDOW_SIZE),
+            ),
             Output::Log { file, duration_ms } => self.log(file.clone(), *duration_ms),
         }
     }
-    fn monitor(&mut self, update_frequency_ms: u64) {
+    fn monitor(&mut self, update_frequency_ms: u64, window_size: usize) {
         let mut now = SystemTime::now();
         let update_interval = Duration::from_millis(update_frequency_ms);
         let mut next = now + update_interval;
@@ -111,7 +127,7 @@ impl Runner {
                     .unwrap();
                 let mut cpu_stats: BTreeMap<usize, CpuStat> = cpu_files
                     .keys()
-                    .map(|&id| (id, CpuStat::new(id, DEFAULT_WINDOW_SIZE)))
+                    .map(|&id| (id, CpuStat::new(id, window_size)))
                     .collect();
                 loop {
                     for (id, path) in &mut cpu_files {
