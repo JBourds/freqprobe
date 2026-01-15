@@ -68,7 +68,7 @@ fn sysfs_cpu_path(id: usize) -> PathBuf {
 
 pub fn cpuset_with_stats(cpuset: &HashSet<usize>) -> Result<BTreeMap<usize, CpuStat>, ProbeError> {
     let cpu_files: BTreeMap<_, _> = cpuset
-        .into_iter()
+        .iter()
         .map(|&id| (id, CpuStat::new(id, WINDOW_SIZE)))
         .collect();
     Ok(cpu_files)
@@ -78,7 +78,7 @@ pub fn parse_sysfs_cpuinfo(
     cpuset: &HashSet<usize>,
 ) -> Result<BTreeMap<PathBuf, CpuStat>, ProbeError> {
     let cpu_files: BTreeMap<_, _> = cpuset
-        .into_iter()
+        .iter()
         .map(|&id| (sysfs_cpu_path(id), CpuStat::new(id, WINDOW_SIZE)))
         .collect();
     Ok(cpu_files)
