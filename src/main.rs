@@ -19,7 +19,8 @@ mod probe;
 
 const DEFAULT_MONITOR_FREQUENCY: u64 = 100;
 const DEFAULT_SAMPLE_FREQUENCY: u64 = 1;
-const DEFAULT_WINDOW_SIZE: usize = 10000;
+const DEFAULT_WINDOW_SIZE: usize = 10_000;
+const KILO: u64 = 1_000;
 
 #[derive(Parser)]
 #[command(name = "freqprobe")]
@@ -131,7 +132,7 @@ impl Runner {
                     .collect();
                 loop {
                     for (id, path) in &mut cpu_files {
-                        let sample = read_sysfs_uint(path);
+                        let sample = read_sysfs_uint(path) * KILO;
                         if let Some(stats) = cpu_stats.get_mut(id) {
                             stats.add_sample(sample);
                         }
